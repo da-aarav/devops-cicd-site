@@ -1,0 +1,52 @@
+name: CI/CD - Deploy to S3 and CloudFront
+
+# Run automatically on every push to the main branch
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # also allow manual runs from the Actions tab
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Get the code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. TEST — make sure the required files exist and HTML has a version
+      - name: Test
+        run: |
+          test -f index.html || { echo "index.html is missing"; exit 1; }
+          test -f styles.css || { echo "styles.css is missing"; exit 1; }
+          test -f script.js  || { echo "script.js is missing"; exit 1; }
+          grep -q "Version:" index.html || { echo "No version found in index.html"; exit 1; }
+          echo "All tests passed."
+
+      # 3. BUILD / PACKAGE — collect the site into a dist/ folder
+      - name: Build / Package
+        run: |
+          mkdir -p dist
+          cp index.html styles.css script.js dist/
+          echo "Build complete. Files packaged into dist/:"
+          ls -la dist
+
+      # 4. Configure AWS credentials from repository secrets
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      # 5. DEPLOY — sync the built site to the S3 bucket
+      - name: Deploy to S3
+        run: aws s3 sync dist/ s3://${{ secrets.S3_BUCKET }} --delete
+
+      # 6. Invalidate CloudFront so the new version is served immediately
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_ID }} \
+            --paths "/*"
