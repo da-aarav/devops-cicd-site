@@ -1,6 +1,6 @@
 // Keep this version string in sync with the badge in index.html.
 // Bump it (e.g. 1.0 -> 2.0), push to main, and the pipeline redeploys automatically.
-const VERSION = "1.0";
+const VERSION = "2.0";
 
 document.addEventListener("DOMContentLoaded", () => {
   const versionEl = document.getElementById("version");
